@@ -1,51 +1,50 @@
 const express = require("express");
 const cors = require("cors");
-const sqlite3 = require("sqlite3").verbose();
+const bodyParser = require("body-parser");
+const { Sequelize, DataTypes } = require("sequelize");
 
 const app = express();
 const port = process.env.port || 4000;
 
+// middlewares
 app.use(cors());
 app.use(express.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-const database = new sqlite3.Database("./data.db", (err) => {
-  if (err) {
-    console.error("Error opening database:", err.message);
-  } else {
-    console.log("Connected to SQLite database");
-    database.run(
-      `
-      CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL
-      )
-    `,
-      (err) => {
-        if (err) {
-          console.error("Error creating table:", err.message);
-        } else {
-          console.log("Tasks table initialized.");
-        }
-      }
-    );
+// Initialize Sequelize with SQLite
+const sequelize = new Sequelize({
+  dialect: "sqlite",
+  storage: "data.db",
+});
+
+// Define the Todo model
+
+const Todo = sequelize.define("Todo", {
+  task: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+});
+
+// Sync the database
+sequelize.sync();
+
+app.get("/todos", async (req, res) => {
+  try {
+    const todos = await Todo.findAll();
+    res.json(todos);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
-let tasks = [
-  {
-    task: "wake up early",
-  },
-];
-
-app.get("/tasks", (req, res) => {
-  res.json(tasks);
-  console.log(tasks);
-});
-
-app.post("/add-task", (req, res) => {
-  const newTask = req.body.task;
-  tasks.push(newTask);
-  res.json({ message: "Your task was added successfully!" });
+app.post("/todos", async (req, res) => {
+  try {
+    const todo = await Todo.create(req.body);
+    res.status(201).json(todo);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
 
 app.listen(port, () => {
